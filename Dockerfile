@@ -1,7 +1,12 @@
 FROM python:3.13-slim AS base
 
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="Forge" \
+      org.opencontainers.image.version="${VERSION}"
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    FORGE_VERSION="${VERSION}"
 
 WORKDIR /app
 
