@@ -1,9 +1,13 @@
 import asyncio
+import os
 
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app, metrics
 from app.models import Event
+
+AUTH_HEADERS = {"Authorization": "Bearer test-forge-token"}
+os.environ["FORGE_AUTH_TOKEN"] = "test-forge-token"
 
 
 def test_event_summary_and_dashboard_endpoints() -> None:
@@ -18,6 +22,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
     ) as client:
         event_response = await client.post(
             "/events",
+            headers=AUTH_HEADERS,
             json={
                 "service": "vault",
                 "event": "command.executed",
@@ -26,8 +31,8 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
                 "exit_code": 0,
             },
         )
-        summary_response = await client.get("/summary")
-        dashboard_response = await client.get("/dashboard")
+        summary_response = await client.get("/summary", headers=AUTH_HEADERS)
+        dashboard_response = await client.get("/dashboard", headers=AUTH_HEADERS)
 
     assert event_response.status_code == 204
     assert summary_response.json() == {
@@ -52,6 +57,7 @@ async def _test_rejects_invalid_event() -> None:
     ) as client:
         response = await client.post(
             "/events",
+            headers=AUTH_HEADERS,
             json={
                 "service": "",
                 "event": "command.executed",
@@ -95,12 +101,31 @@ async def _test_filtered_summary_and_configurable_dashboard() -> None:
     ) as client:
         summary_response = await client.get(
             "/summary",
+            headers=AUTH_HEADERS,
             params={"event": "plugin.custom"},
         )
         dashboard_response = await client.get(
             "/dashboard",
+            headers=AUTH_HEADERS,
             params={"service": "vault", "width": 5},
         )
 
     assert summary_response.json()["commands"] == {"compile": 1}
     assert "vault  " + "█" * 5 + " 1" in dashboard_response.text
+
+
+def test_requires_authentication_but_leaves_health_public() -> None:
+    asyncio.run(_test_requires_authentication_but_leaves_health_public())
+
+
+async def _test_requires_authentication_but_leaves_health_public() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://forge",
+    ) as client:
+        summary_response = await client.get("/summary")
+        health_response = await client.get("/healthz")
+
+    assert summary_response.status_code == 401
+    assert summary_response.headers["www-authenticate"] == "Bearer"
+    assert health_response.status_code == 200
