@@ -43,7 +43,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         "commands": {"grep": 1},
     }
     assert dashboard_response.status_code == 200
-    assert "grep  [###############] 1" in dashboard_response.text
+    assert "grep  " + "█" * 15 + " 1" in dashboard_response.text
 
 
 def test_rejects_invalid_event() -> None:
@@ -111,7 +111,7 @@ async def _test_filtered_summary_and_configurable_dashboard() -> None:
         )
 
     assert summary_response.json()["commands"] == {"compile": 1}
-    assert "vault  [#####] 1" in dashboard_response.text
+    assert "vault  " + "█" * 5 + " 1" in dashboard_response.text
 
 
 def test_requires_authentication_but_leaves_health_public() -> None:
