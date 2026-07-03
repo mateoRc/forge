@@ -1,7 +1,7 @@
 # Forge
 
-Forge is the lightweight telemetry and ASCII dashboard service (used by Vault & Atlas). It receives HTTP events, aggregates metrics in memory, and renders
-operational summaries.
+Forge receives telemetry from Vaultsh and Atlas, aggregates metrics in memory,
+and renders text summaries.
 
 ## Run locally
 
@@ -12,13 +12,8 @@ cd ../lab
 docker compose up --build
 ```
 
-Verify the service:
-
-```sh
-curl http://localhost:8082/healthz
-```
-
-The response is `200 OK` with the body `ok`.
+Forge is private in the standard Compose stack. Run it separately on port 8082
+for direct API development.
 
 Other endpoints:
 
@@ -32,5 +27,4 @@ Other endpoints:
 docker build --target test .
 ```
 
-Long-form documentation and the Forge roadmap are maintained in the sibling
-`lab` repository under `content/docs/`.
+Architecture and roadmap documentation lives in the sibling `lab` repository.

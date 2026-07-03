@@ -3,8 +3,8 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Query, Response, status
 from fastapi.responses import PlainTextResponse
 
-from app.dashboard import render
 from app.auth import require_service_token
+from app.dashboard import render
 from app.metrics import Metrics
 from app.models import Event, Summary
 
