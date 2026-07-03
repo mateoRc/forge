@@ -21,6 +21,9 @@ Other endpoints:
 - `GET /summary`
 - `GET /dashboard`
 
+The dashboard renders request totals, error rate, latency, service traffic, and
+popular commands as compact terminal-friendly ASCII output.
+
 ## Test
 
 ```sh

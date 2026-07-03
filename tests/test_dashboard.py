@@ -13,11 +13,12 @@ def test_renders_ascii_dashboard() -> None:
         )
     )
 
-    assert "Forge dashboard" in output
-    assert "requests: 3" in output
-    assert "errors:   1" in output
-    assert "vault  " + "█" * 15 + " 2" in output
-    assert "atlas  " + "█" * 8 + " 1" in output
+    assert "LIVE ACTIVITY\n=============" in output
+    assert "requests      3" in output
+    assert "errors        1" in output
+    assert "error rate    [#####..........] 33.3%" in output
+    assert "vault  [###############] 2" in output
+    assert "atlas  [########.......] 1" in output
 
 
 def test_uses_configured_bar_width() -> None:
@@ -32,4 +33,4 @@ def test_uses_configured_bar_width() -> None:
         width=5,
     )
 
-    assert "vault  " + "█" * 5 + " 1" in output
+    assert "vault  [#####] 1" in output
