@@ -13,6 +13,7 @@ def test_aggregates_requests_errors_duration_services_and_commands() -> None:
     assert summary.requests == 3
     assert summary.errors == 1
     assert summary.avg_ms == 6
+    assert summary.median_ms == 6
     assert summary.services == {"vault": 2, "atlas": 1}
     assert summary.commands == {"grep": 1, "cat": 1, "search": 1}
 
@@ -28,6 +29,7 @@ def test_filters_events_and_recalculates_aggregates() -> None:
     assert summary.requests == 1
     assert summary.errors == 1
     assert summary.avg_ms == 4
+    assert summary.median_ms == 4
     assert summary.services == {"vault": 1}
     assert summary.commands == {"cat": 1}
 
@@ -45,6 +47,18 @@ def test_accepts_and_filters_unknown_event_types() -> None:
     )
 
     assert metrics.summary(event="plugin.custom").requests == 1
+
+
+def test_median_is_not_distorted_by_an_outlier() -> None:
+    metrics = Metrics()
+    metrics.record(_event("vault", "grep", 1, 0))
+    metrics.record(_event("vault", "grep", 2, 0))
+    metrics.record(_event("vault", "grep", 100, 0))
+
+    summary = metrics.summary()
+
+    assert summary.avg_ms == 34.33
+    assert summary.median_ms == 2
 
 
 def _event(service: str, name: str, duration_ms: int, exit_code: int) -> Event:

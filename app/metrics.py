@@ -1,8 +1,12 @@
 from collections import Counter
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
+from statistics import median
 from threading import Lock
 
 from app.models import Event, Summary
+
+MAX_DURATION_SAMPLES = 2048
 
 
 @dataclass(frozen=True)
@@ -17,6 +21,9 @@ class EventMetrics:
     requests: int = 0
     errors: int = 0
     duration_ms: int = 0
+    durations: deque[int] = field(
+        default_factory=lambda: deque(maxlen=MAX_DURATION_SAMPLES)
+    )
 
 
 class Metrics:
@@ -31,6 +38,7 @@ class Metrics:
             values.requests += 1
             values.errors += int(event.exit_code != 0)
             values.duration_ms += event.duration_ms
+            values.durations.append(event.duration_ms)
 
     def summary(
         self,
@@ -42,6 +50,7 @@ class Metrics:
             requests = 0
             errors = 0
             duration_ms = 0
+            durations: list[int] = []
             services: Counter[str] = Counter()
             commands: Counter[str] = Counter()
 
@@ -55,14 +64,17 @@ class Metrics:
                 requests += values.requests
                 errors += values.errors
                 duration_ms += values.duration_ms
+                durations.extend(values.durations)
                 services[key.service] += values.requests
                 commands[key.name] += values.requests
 
             average = duration_ms / requests if requests else 0.0
+            median_duration = median(durations) if durations else 0.0
             return Summary(
                 requests=requests,
                 errors=errors,
                 avg_ms=round(average, 2),
+                median_ms=round(median_duration, 2),
                 services=dict(services.most_common()),
                 commands=dict(commands.most_common()),
             )

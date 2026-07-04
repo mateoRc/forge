@@ -13,6 +13,6 @@ class Summary(BaseModel):
     requests: int
     errors: int
     avg_ms: float
+    median_ms: float
     services: dict[str, int]
     commands: dict[str, int]
-

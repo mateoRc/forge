@@ -12,6 +12,7 @@ def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
         f"errors        {summary.errors}",
         f"error rate    {error_rate:.1%}",
         f"avg latency   {summary.avg_ms:g} ms",
+        f"median (p50)  {summary.median_ms:g} ms",
         "",
         "REQUESTS BY SERVICE",
         "===================",

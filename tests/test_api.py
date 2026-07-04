@@ -39,6 +39,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         "requests": 1,
         "errors": 0,
         "avg_ms": 8.0,
+        "median_ms": 8.0,
         "services": {"vault": 1},
         "commands": {"grep": 1},
     }
