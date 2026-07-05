@@ -61,4 +61,4 @@ jobs:
             -H "Authorization: Bearer $LAB_DISPATCH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/mateoRc/lab/dispatches \
-            -d "{\"event_type\":\"service-ci-completed\",\"client_payload\":{\"repository\":\"forge\",\"sha\":\"$GITHUB_SHA\"}}"
+            -d "{\"event_type\":\"service-ci-completed\",\"client_payload\":{\"repository\":\"forge\",\"sha\":\"$GITHUB_SHA\",\"run_id\":\"$GITHUB_RUN_ID\",\"conclusion\":\"success\"}}"
