@@ -9,7 +9,7 @@ from app.metrics import Metrics
 from app.models import Event, Summary
 
 app = FastAPI(title="Forge")
-metrics = Metrics()
+metrics = Metrics.from_environment()
 
 
 @app.get("/healthz", response_class=PlainTextResponse)

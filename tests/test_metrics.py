@@ -1,5 +1,12 @@
+import sqlite3
+import tempfile
+from contextlib import closing
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
 from app.metrics import Metrics
 from app.models import Event
+from app.storage import MINIMUM_DATABASE_BYTES
 
 
 def test_aggregates_requests_errors_duration_services_and_commands() -> None:
@@ -59,6 +66,93 @@ def test_median_is_not_distorted_by_an_outlier() -> None:
 
     assert summary.avg_ms == 34.33
     assert summary.median_ms == 2
+
+
+def test_events_survive_database_reopen() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        first = Metrics(database)
+        first.record(_event("vault", "grep", 8, 0))
+        first.close()
+
+        second = Metrics(database)
+        summary = second.summary()
+        second.close()
+
+    assert summary.requests == 1
+    assert summary.commands == {"grep": 1}
+
+
+def test_applies_all_database_migrations() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        metrics = Metrics(database)
+        metrics.close()
+        with closing(sqlite3.connect(database)) as connection:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            indexes = {
+                row[0]
+                for row in connection.execute(
+                    """
+                    SELECT name FROM sqlite_master
+                    WHERE type = 'index' AND tbl_name = 'events'
+                    """
+                )
+            }
+
+    assert version == 2
+    assert indexes == {"events_recorded_at_idx", "events_dimensions_idx"}
+
+
+def test_records_server_generated_utc_timestamp() -> None:
+    recorded_at = datetime(2026, 7, 6, 12, 30, tzinfo=UTC)
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        metrics = Metrics(database, now=lambda: recorded_at)
+        metrics.record(_event("vault", "grep", 8, 0))
+        metrics.close()
+        with closing(sqlite3.connect(database)) as connection:
+            stored = connection.execute(
+                "SELECT recorded_at FROM events"
+            ).fetchone()[0]
+
+    assert stored == "2026-07-06T12:30:00+00:00"
+
+
+def test_retention_removes_expired_events() -> None:
+    current = [datetime(2026, 7, 1, tzinfo=UTC)]
+    metrics = Metrics(retention_days=1, now=lambda: current[0])
+    metrics.record(_event("vault", "old", 8, 0))
+    current[0] += timedelta(days=2)
+    metrics.record(_event("vault", "current", 4, 0))
+
+    summary = metrics.summary()
+
+    assert summary.requests == 1
+    assert summary.commands == {"current": 1}
+
+
+def test_database_size_limit_removes_oldest_events() -> None:
+    event_count = 800
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        metrics = Metrics(
+            database,
+            max_database_bytes=MINIMUM_DATABASE_BYTES,
+        )
+        for index in range(event_count):
+            metrics.record(
+                _event("vault", f"command-{index:04d}", index, 0)
+            )
+        retained = metrics.summary()
+        metrics.close()
+        size = database.stat().st_size
+        wal = Path(f"{database}-wal")
+        if wal.exists():
+            size += wal.stat().st_size
+
+    assert 0 < retained.requests < event_count
+    assert size <= MINIMUM_DATABASE_BYTES
 
 
 def _event(service: str, name: str, duration_ms: int, exit_code: int) -> Event:

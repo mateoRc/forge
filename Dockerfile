@@ -19,13 +19,17 @@ COPY requirements-dev.txt .
 RUN pip install --no-cache-dir --requirement requirements-dev.txt
 
 COPY app app
+COPY scripts scripts
 COPY tests tests
 RUN python -m pytest
 
 FROM base AS runtime
 
-RUN useradd --create-home forge
+RUN useradd --create-home forge \
+    && mkdir --parents /app/data \
+    && chown forge:forge /app/data
 COPY --from=test --chown=forge:forge /app/app app
+COPY --from=test --chown=forge:forge /app/scripts scripts
 
 USER forge
 EXPOSE 8080

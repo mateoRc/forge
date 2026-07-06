@@ -1,10 +1,24 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Event(BaseModel):
-    service: str = Field(min_length=1)
-    event: str = Field(min_length=1)
-    name: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    service: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    event: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
+    name: str = Field(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
     duration_ms: int = Field(ge=0)
     exit_code: int
 

@@ -1,0 +1,217 @@
+import sqlite3
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from threading import Lock
+
+from app.models import Event
+
+DEFAULT_DATABASE_PATH = ":memory:"
+DEFAULT_RETENTION_DAYS = 30
+DEFAULT_MAX_DATABASE_BYTES = 128 * 1024 * 1024
+MINIMUM_DATABASE_BYTES = 64 * 1024
+SIZE_REDUCTION_BATCH = 500
+
+
+@dataclass(frozen=True)
+class StoredEvent:
+    service: str
+    name: str
+    duration_ms: int
+    exit_code: int
+
+
+class SQLiteEventStore:
+    def __init__(
+        self,
+        database_path: str | Path,
+        retention_days: int,
+        max_database_bytes: int,
+        now: Callable[[], datetime] | None = None,
+    ) -> None:
+        if retention_days < 1:
+            raise ValueError("retention_days must be positive")
+        if max_database_bytes < MINIMUM_DATABASE_BYTES:
+            raise ValueError(
+                f"max_database_bytes must be at least {MINIMUM_DATABASE_BYTES}"
+            )
+
+        self._database_path = str(database_path)
+        self._retention = timedelta(days=retention_days)
+        self._max_database_bytes = max_database_bytes
+        self._now = now or (lambda: datetime.now(UTC))
+        self._lock = Lock()
+        self._connection = self._open()
+        self._migrate()
+        self._checkpoint()
+        self._enforce_limits()
+
+    def record(self, event: Event) -> None:
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT INTO events (
+                    recorded_at,
+                    service,
+                    event,
+                    name,
+                    duration_ms,
+                    exit_code
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    _utc_text(self._now()),
+                    event.service,
+                    event.event,
+                    event.name,
+                    event.duration_ms,
+                    event.exit_code,
+                ),
+            )
+            self._connection.commit()
+            self._enforce_limits()
+
+    def query(
+        self,
+        service: str | None = None,
+        event: str | None = None,
+        name: str | None = None,
+    ) -> tuple[StoredEvent, ...]:
+        query, parameters = _select_query(service, event, name)
+        with self._lock:
+            self._enforce_limits()
+            rows = self._connection.execute(query, parameters).fetchall()
+        return tuple(
+            StoredEvent(
+                service=row["service"],
+                name=row["name"],
+                duration_ms=row["duration_ms"],
+                exit_code=row["exit_code"],
+            )
+            for row in rows
+        )
+
+    def reset(self) -> None:
+        with self._lock:
+            self._connection.execute("DELETE FROM events")
+            self._connection.commit()
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
+    def _open(self) -> sqlite3.Connection:
+        if self._database_path != DEFAULT_DATABASE_PATH:
+            Path(self._database_path).parent.mkdir(parents=True, exist_ok=True)
+        connection = sqlite3.connect(
+            self._database_path,
+            check_same_thread=False,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
+        if self._database_path != DEFAULT_DATABASE_PATH:
+            connection.execute("PRAGMA journal_mode = WAL")
+            connection.execute("PRAGMA synchronous = NORMAL")
+        return connection
+
+    def _migrate(self) -> None:
+        migrations = sorted(Path(__file__).with_name("migrations").glob("*.sql"))
+        if not migrations:
+            raise RuntimeError("no database migrations found")
+        for migration in migrations:
+            version_text, separator, _ = migration.name.partition("_")
+            if not separator or not version_text.isdigit():
+                raise ValueError(f"invalid migration filename: {migration.name}")
+            version = int(version_text)
+            current = self._connection.execute("PRAGMA user_version").fetchone()[0]
+            if version <= current:
+                continue
+            if version != current + 1:
+                raise ValueError(
+                    f"missing database migration between {current} and {version}"
+                )
+            script = migration.read_text(encoding="utf-8")
+            self._connection.executescript(
+                f"BEGIN;\n{script}\nPRAGMA user_version = {version};\nCOMMIT;"
+            )
+
+    def _enforce_limits(self) -> None:
+        cutoff = _utc_text(self._now() - self._retention)
+        self._connection.execute(
+            "DELETE FROM events WHERE recorded_at < ?",
+            (cutoff,),
+        )
+        self._connection.commit()
+
+        while self._database_size() > self._max_database_bytes:
+            event_count = self._connection.execute(
+                "SELECT COUNT(*) FROM events"
+            ).fetchone()[0]
+            batch_size = min(
+                SIZE_REDUCTION_BATCH,
+                max(1, event_count // 10),
+            )
+            deleted = self._connection.execute(
+                """
+                DELETE FROM events
+                WHERE id IN (
+                    SELECT id FROM events ORDER BY id LIMIT ?
+                )
+                """,
+                (batch_size,),
+            ).rowcount
+            self._connection.commit()
+            self._compact()
+            if deleted == 0:
+                raise RuntimeError(
+                    "database schema exceeds FORGE_MAX_DATABASE_BYTES"
+                )
+
+    def _database_size(self) -> int:
+        if self._database_path == DEFAULT_DATABASE_PATH:
+            return 0
+        path = Path(self._database_path)
+        wal_path = Path(f"{self._database_path}-wal")
+        return _file_size(path) + _file_size(wal_path)
+
+    def _compact(self) -> None:
+        self._checkpoint()
+        self._connection.execute("VACUUM")
+
+    def _checkpoint(self) -> None:
+        if self._database_path != DEFAULT_DATABASE_PATH:
+            self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
+
+def _select_query(
+    service: str | None,
+    event: str | None,
+    name: str | None,
+) -> tuple[str, tuple[str, ...]]:
+    filters: list[str] = []
+    parameters: list[str] = []
+    for column, value in (("service", service), ("event", event), ("name", name)):
+        if value is not None:
+            filters.append(f"{column} = ?")
+            parameters.append(value)
+    where = f" WHERE {' AND '.join(filters)}" if filters else ""
+    return (
+        "SELECT service, name, duration_ms, exit_code FROM events"
+        f"{where} ORDER BY id",
+        tuple(parameters),
+    )
+
+
+def _utc_text(value: datetime) -> str:
+    if value.tzinfo is None:
+        raise ValueError("event timestamp must include a timezone")
+    return value.astimezone(UTC).isoformat(timespec="seconds")
+
+
+def _file_size(path: Path) -> int:
+    try:
+        return path.stat().st_size
+    except FileNotFoundError:
+        return 0

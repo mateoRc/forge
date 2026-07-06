@@ -71,6 +71,31 @@ async def _test_rejects_invalid_event() -> None:
     assert response.status_code == 422
 
 
+def test_rejects_unknown_event_fields() -> None:
+    asyncio.run(_test_rejects_unknown_event_fields())
+
+
+async def _test_rejects_unknown_event_fields() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://forge",
+    ) as client:
+        response = await client.post(
+            "/events",
+            headers=AUTH_HEADERS,
+            json={
+                "service": "vault",
+                "event": "command.executed",
+                "name": "grep",
+                "duration_ms": 8,
+                "exit_code": 0,
+                "token": "must-not-be-accepted",
+            },
+        )
+
+    assert response.status_code == 422
+
+
 def test_filtered_summary_and_configurable_dashboard() -> None:
     asyncio.run(_test_filtered_summary_and_configurable_dashboard())
 
