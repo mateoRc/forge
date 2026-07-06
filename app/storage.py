@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Lock
+from typing import Literal
 
 from app.models import Event
 
@@ -15,11 +16,13 @@ SIZE_REDUCTION_BATCH = 500
 
 
 @dataclass(frozen=True)
-class StoredEvent:
-    service: str
-    name: str
-    duration_ms: int
-    exit_code: int
+class StoredSummary:
+    requests: int
+    errors: int
+    average_ms: float
+    durations: tuple[int, ...]
+    services: dict[str, int]
+    commands: dict[str, int]
 
 
 class SQLiteEventStore:
@@ -72,24 +75,43 @@ class SQLiteEventStore:
             self._connection.commit()
             self._enforce_limits()
 
-    def query(
+    def summary(
         self,
         service: str | None = None,
         event: str | None = None,
         name: str | None = None,
-    ) -> tuple[StoredEvent, ...]:
-        query, parameters = _select_query(service, event, name)
+    ) -> StoredSummary:
+        where, parameters = _where_clause(service, event, name)
         with self._lock:
             self._enforce_limits()
-            rows = self._connection.execute(query, parameters).fetchall()
-        return tuple(
-            StoredEvent(
-                service=row["service"],
-                name=row["name"],
-                duration_ms=row["duration_ms"],
-                exit_code=row["exit_code"],
+            totals = self._connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS requests,
+                    COALESCE(SUM(CASE WHEN exit_code != 0 THEN 1 ELSE 0 END), 0)
+                        AS errors,
+                    COALESCE(AVG(duration_ms), 0) AS average_ms
+                FROM events
+                """
+                + where,
+                parameters,
+            ).fetchone()
+            durations = tuple(
+                row["duration_ms"]
+                for row in self._connection.execute(
+                    "SELECT duration_ms FROM events" + where,
+                    parameters,
+                )
             )
-            for row in rows
+            services = self._counts("service", where, parameters)
+            commands = self._counts("name", where, parameters)
+        return StoredSummary(
+            requests=totals["requests"],
+            errors=totals["errors"],
+            average_ms=totals["average_ms"],
+            durations=durations,
+            services=services,
+            commands=commands,
         )
 
     def reset(self) -> None:
@@ -115,6 +137,24 @@ class SQLiteEventStore:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA synchronous = NORMAL")
         return connection
+
+    def _counts(
+        self,
+        column: Literal["service", "name"],
+        where: str,
+        parameters: tuple[str, ...],
+    ) -> dict[str, int]:
+        rows = self._connection.execute(
+            f"""
+            SELECT {column} AS label, COUNT(*) AS requests, MIN(id) AS first_id
+            FROM events
+            {where}
+            GROUP BY {column}
+            ORDER BY requests DESC, first_id
+            """,
+            parameters,
+        )
+        return {row["label"]: row["requests"] for row in rows}
 
     def _migrate(self) -> None:
         migrations = sorted(Path(__file__).with_name("migrations").glob("*.sql"))
@@ -185,7 +225,7 @@ class SQLiteEventStore:
             self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
-def _select_query(
+def _where_clause(
     service: str | None,
     event: str | None,
     name: str | None,
@@ -197,11 +237,7 @@ def _select_query(
             filters.append(f"{column} = ?")
             parameters.append(value)
     where = f" WHERE {' AND '.join(filters)}" if filters else ""
-    return (
-        "SELECT service, name, duration_ms, exit_code FROM events"
-        f"{where} ORDER BY id",
-        tuple(parameters),
-    )
+    return where, tuple(parameters)
 
 
 def _utc_text(value: datetime) -> str:

@@ -96,6 +96,30 @@ async def _test_rejects_unknown_event_fields() -> None:
     assert response.status_code == 422
 
 
+def test_rejects_out_of_range_numeric_fields() -> None:
+    asyncio.run(_test_rejects_out_of_range_numeric_fields())
+
+
+async def _test_rejects_out_of_range_numeric_fields() -> None:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://forge",
+    ) as client:
+        response = await client.post(
+            "/events",
+            headers=AUTH_HEADERS,
+            json={
+                "service": "vault",
+                "event": "command.executed",
+                "name": "grep",
+                "duration_ms": 86400001,
+                "exit_code": 256,
+            },
+        )
+
+    assert response.status_code == 422
+
+
 def test_filtered_summary_and_configurable_dashboard() -> None:
     asyncio.run(_test_filtered_summary_and_configurable_dashboard())
 

@@ -1,5 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+MAX_DURATION_MS = 24 * 60 * 60 * 1000
+MAX_EXIT_CODE = 255
+
 
 class Event(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -19,8 +22,8 @@ class Event(BaseModel):
         max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
     )
-    duration_ms: int = Field(ge=0)
-    exit_code: int
+    duration_ms: int = Field(ge=0, le=MAX_DURATION_MS)
+    exit_code: int = Field(ge=0, le=MAX_EXIT_CODE)
 
 
 class Summary(BaseModel):

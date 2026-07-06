@@ -27,7 +27,14 @@ def record_event(event: Event) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-OptionalFilter = Annotated[str | None, Query(min_length=1)]
+OptionalFilter = Annotated[
+    str | None,
+    Query(
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    ),
+]
 
 
 @app.get("/summary", dependencies=[Depends(require_service_token)])

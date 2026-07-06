@@ -1,5 +1,4 @@
 import os
-from collections import Counter
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -52,21 +51,15 @@ class Metrics:
         event: str | None = None,
         name: str | None = None,
     ) -> Summary:
-        rows = self._store.query(service=service, event=event, name=name)
-        requests = len(rows)
-        errors = sum(int(row.exit_code != 0) for row in rows)
-        durations = [row.duration_ms for row in rows]
-        services = Counter(row.service for row in rows)
-        commands = Counter(row.name for row in rows)
-        average = sum(durations) / requests if requests else 0.0
-        median_duration = median(durations) if durations else 0.0
+        stored = self._store.summary(service=service, event=event, name=name)
+        median_duration = median(stored.durations) if stored.durations else 0.0
         return Summary(
-            requests=requests,
-            errors=errors,
-            avg_ms=round(average, 2),
+            requests=stored.requests,
+            errors=stored.errors,
+            avg_ms=round(stored.average_ms, 2),
             median_ms=round(median_duration, 2),
-            services=dict(services.most_common()),
-            commands=dict(commands.most_common()),
+            services=stored.services,
+            commands=stored.commands,
         )
 
     def reset(self) -> None:
