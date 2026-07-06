@@ -1,34 +1,23 @@
 # Forge
 
-Forge receives telemetry from Vaultsh and Atlas, aggregates metrics in memory,
-and renders text summaries.
+The Python/FastAPI telemetry service used by Vaultsh and Atlas. Backend Lab
+owns its
+[architecture and roadmap](https://github.com/mateoRc/lab/tree/main/content/docs).
 
-## Run locally
+## Develop
 
-Run Forge with the other services through the sibling `lab` repository:
+Run the integrated stack:
 
 ```sh
 cd ../lab
 docker compose up --build
 ```
 
-Forge is private in the standard Compose stack. Run it separately on port 8082
-for direct API development.
-
-Other endpoints:
-
-- `POST /events`
-- `GET /summary`
-- `GET /dashboard`
-
-The dashboard renders request totals, error rate, average and median latency,
-service traffic, and popular commands as compact terminal-friendly ASCII
-output. Median latency uses a bounded recent sample per operation.
+For direct API development, run the application directly and set
+`FORGE_AUTH_TOKEN`. The container listens on port 8080.
 
 ## Test
 
 ```sh
 docker build --target test .
 ```
-
-Architecture and roadmap documentation lives in the sibling `lab` repository.
