@@ -27,9 +27,10 @@ def restore(database: Path, source: Path) -> None:
     try:
         _copy(source, temporary)
         _verify(temporary)
+        _checkpoint(database)
+        os.replace(temporary, database)
         _remove(Path(f"{database}-wal"))
         _remove(Path(f"{database}-shm"))
-        os.replace(temporary, database)
     finally:
         _remove(temporary)
 
@@ -38,6 +39,13 @@ def _copy(source: Path, target: Path) -> None:
     with closing(sqlite3.connect(source)) as source_connection:
         with closing(sqlite3.connect(target)) as target_connection:
             source_connection.backup(target_connection)
+
+
+def _checkpoint(database: Path) -> None:
+    if not database.is_file():
+        return
+    with closing(sqlite3.connect(database)) as connection:
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def _verify(database: Path) -> None:
