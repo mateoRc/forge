@@ -36,12 +36,18 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
 
     assert event_response.status_code == 204
     assert summary_response.json() == {
+        "window_hours": 24,
         "requests": 1,
         "errors": 0,
         "avg_ms": 8.0,
         "median_ms": 8.0,
+        "p95_ms": 8.0,
         "services": {"vault": 1},
         "commands": {"grep": 1},
+        "retained_events": 1,
+        "oldest_event_age_days": 0,
+        "database_bytes": None,
+        "database_max_bytes": 134217728,
     }
     assert dashboard_response.status_code == 200
     assert "grep  " + "█" * 15 + " 1" in dashboard_response.text

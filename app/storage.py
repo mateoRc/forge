@@ -23,6 +23,10 @@ class StoredSummary:
     durations: tuple[int, ...]
     services: dict[str, int]
     commands: dict[str, int]
+    retained_events: int
+    oldest_event_age_days: int | None
+    database_bytes: int | None
+    database_max_bytes: int
 
 
 class SQLiteEventStore:
@@ -77,11 +81,14 @@ class SQLiteEventStore:
 
     def summary(
         self,
+        window_hours: int,
         service: str | None = None,
         event: str | None = None,
         name: str | None = None,
     ) -> StoredSummary:
-        where, parameters = _where_clause(service, event, name)
+        now = self._now()
+        since = _utc_text(now - timedelta(hours=window_hours))
+        where, parameters = _where_clause(since, service, event, name)
         with self._lock:
             self._enforce_limits()
             totals = self._connection.execute(
@@ -99,12 +106,17 @@ class SQLiteEventStore:
             durations = tuple(
                 row["duration_ms"]
                 for row in self._connection.execute(
-                    "SELECT duration_ms FROM events" + where,
+                    "SELECT duration_ms FROM events"
+                    + where
+                    + " ORDER BY duration_ms",
                     parameters,
                 )
             )
             services = self._counts("service", where, parameters)
             commands = self._counts("name", where, parameters)
+            retained = self._connection.execute(
+                "SELECT COUNT(*) AS count, MIN(recorded_at) AS oldest FROM events"
+            ).fetchone()
         return StoredSummary(
             requests=totals["requests"],
             errors=totals["errors"],
@@ -112,6 +124,14 @@ class SQLiteEventStore:
             durations=durations,
             services=services,
             commands=commands,
+            retained_events=retained["count"],
+            oldest_event_age_days=_age_days(now, retained["oldest"]),
+            database_bytes=(
+                None
+                if self._database_path == DEFAULT_DATABASE_PATH
+                else self._database_size()
+            ),
+            database_max_bytes=self._max_database_bytes,
         )
 
     def reset(self) -> None:
@@ -226,12 +246,13 @@ class SQLiteEventStore:
 
 
 def _where_clause(
+    since: str,
     service: str | None,
     event: str | None,
     name: str | None,
 ) -> tuple[str, tuple[str, ...]]:
-    filters: list[str] = []
-    parameters: list[str] = []
+    filters = ["recorded_at >= ?"]
+    parameters = [since]
     for column, value in (("service", service), ("event", event), ("name", name)):
         if value is not None:
             filters.append(f"{column} = ?")
@@ -244,6 +265,13 @@ def _utc_text(value: datetime) -> str:
     if value.tzinfo is None:
         raise ValueError("event timestamp must include a timezone")
     return value.astimezone(UTC).isoformat(timespec="seconds")
+
+
+def _age_days(now: datetime, oldest: str | None) -> int | None:
+    if oldest is None:
+        return None
+    recorded_at = datetime.fromisoformat(oldest)
+    return max(0, (now.astimezone(UTC) - recorded_at).days)
 
 
 def _file_size(path: Path) -> int:

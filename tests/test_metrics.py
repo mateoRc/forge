@@ -21,6 +21,7 @@ def test_aggregates_requests_errors_duration_services_and_commands() -> None:
     assert summary.errors == 1
     assert summary.avg_ms == 6
     assert summary.median_ms == 6
+    assert summary.p95_ms == 8
     assert summary.services == {"vault": 2, "atlas": 1}
     assert summary.commands == {"grep": 1, "cat": 1, "search": 1}
 
@@ -130,6 +131,22 @@ def test_retention_removes_expired_events() -> None:
 
     assert summary.requests == 1
     assert summary.commands == {"current": 1}
+
+
+def test_summary_applies_selected_time_window() -> None:
+    current = [datetime(2026, 7, 1, tzinfo=UTC)]
+    metrics = Metrics(retention_days=30, now=lambda: current[0])
+    metrics.record(_event("vault", "older", 8, 0))
+    current[0] += timedelta(days=2)
+    metrics.record(_event("vault", "current", 4, 0))
+
+    daily = metrics.summary(window_hours=24)
+    weekly = metrics.summary(window_hours=168)
+
+    assert daily.commands == {"current": 1}
+    assert weekly.commands == {"older": 1, "current": 1}
+    assert daily.retained_events == 2
+    assert daily.oldest_event_age_days == 2
 
 
 def test_database_size_limit_removes_oldest_events() -> None:

@@ -1,3 +1,4 @@
+import math
 import os
 from collections.abc import Callable
 from datetime import datetime
@@ -47,19 +48,31 @@ class Metrics:
 
     def summary(
         self,
+        window_hours: int = 24,
         service: str | None = None,
         event: str | None = None,
         name: str | None = None,
     ) -> Summary:
-        stored = self._store.summary(service=service, event=event, name=name)
+        stored = self._store.summary(
+            window_hours=window_hours,
+            service=service,
+            event=event,
+            name=name,
+        )
         median_duration = median(stored.durations) if stored.durations else 0.0
         return Summary(
+            window_hours=window_hours,
             requests=stored.requests,
             errors=stored.errors,
             avg_ms=round(stored.average_ms, 2),
             median_ms=round(median_duration, 2),
+            p95_ms=_percentile(stored.durations, 0.95),
             services=stored.services,
             commands=stored.commands,
+            retained_events=stored.retained_events,
+            oldest_event_age_days=stored.oldest_event_age_days,
+            database_bytes=stored.database_bytes,
+            database_max_bytes=stored.database_max_bytes,
         )
 
     def reset(self) -> None:
@@ -80,3 +93,10 @@ def _positive_environment_integer(name: str, default: int) -> int:
     if parsed < 1:
         raise ValueError(f"{name} must be positive")
     return parsed
+
+
+def _percentile(values: tuple[int, ...], percentile: float) -> float:
+    if not values:
+        return 0.0
+    index = max(0, math.ceil(len(values) * percentile) - 1)
+    return round(float(values[index]), 2)

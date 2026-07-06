@@ -27,9 +27,15 @@ class Event(BaseModel):
 
 
 class Summary(BaseModel):
+    window_hours: int
     requests: int
     errors: int
     avg_ms: float
     median_ms: float
+    p95_ms: float
     services: dict[str, int]
     commands: dict[str, int]
+    retained_events: int
+    oldest_event_age_days: int | None
+    database_bytes: int | None
+    database_max_bytes: int

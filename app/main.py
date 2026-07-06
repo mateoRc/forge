@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Query, Response, status
 from fastapi.responses import PlainTextResponse
@@ -35,15 +35,22 @@ OptionalFilter = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
     ),
 ]
+TimeWindow = Annotated[Literal[24, 168, 720], Query()]
 
 
 @app.get("/summary", dependencies=[Depends(require_service_token)])
 def summary(
+    hours: TimeWindow = 24,
     service: OptionalFilter = None,
     event: OptionalFilter = None,
     name: OptionalFilter = None,
 ) -> Summary:
-    return metrics.summary(service=service, event=event, name=name)
+    return metrics.summary(
+        window_hours=hours,
+        service=service,
+        event=event,
+        name=name,
+    )
 
 
 @app.get(
@@ -53,11 +60,17 @@ def summary(
 )
 def dashboard(
     width: Annotated[int, Query(ge=1, le=100)] = 15,
+    hours: TimeWindow = 24,
     service: OptionalFilter = None,
     event: OptionalFilter = None,
     name: OptionalFilter = None,
 ) -> str:
     return render(
-        metrics.summary(service=service, event=event, name=name),
+        metrics.summary(
+            window_hours=hours,
+            service=service,
+            event=event,
+            name=name,
+        ),
         width=width,
     )
