@@ -25,6 +25,12 @@ class EventMetrics:
         default_factory=lambda: deque(maxlen=MAX_DURATION_SAMPLES)
     )
 
+    def record(self, event: Event) -> None:
+        self.requests += 1
+        self.errors += int(event.exit_code != 0)
+        self.duration_ms += event.duration_ms
+        self.durations.append(event.duration_ms)
+
 
 class Metrics:
     def __init__(self) -> None:
@@ -35,10 +41,7 @@ class Metrics:
         with self._lock:
             key = EventKey(event.service, event.event, event.name)
             values = self._events.setdefault(key, EventMetrics())
-            values.requests += 1
-            values.errors += int(event.exit_code != 0)
-            values.duration_ms += event.duration_ms
-            values.durations.append(event.duration_ms)
+            values.record(event)
 
     def summary(
         self,
