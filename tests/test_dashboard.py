@@ -8,7 +8,7 @@ def test_renders_persisted_activity_dashboard() -> None:
     assert "ACTIVITY · LAST 24 HOURS" in output
     assert "requests       3" in output
     assert "errors         1  (33.3%)" in output
-    assert "latency        6 ms avg · 6 ms p50 · 8 ms p95" in output
+    assert "command time   6 ms avg · 6 ms p50 · 8 ms p95" in output
     assert "vault  " + "█" * 15 + " 2" in output
     assert "atlas  " + "█" * 8 + " 1" in output
     assert "retained events  42" in output
