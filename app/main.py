@@ -1,3 +1,4 @@
+import time
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, Query, Response, status
@@ -10,11 +11,20 @@ from app.models import Event, Summary
 
 app = FastAPI(title="Forge")
 metrics = Metrics.from_environment()
+STARTED_AT = time.monotonic()
 
 
 @app.get("/healthz", response_class=PlainTextResponse)
 def health() -> str:
     return "ok"
+
+
+@app.get("/status")
+def service_status() -> dict[str, int | str]:
+    return {
+        "status": "ok",
+        "uptime_seconds": int(time.monotonic() - STARTED_AT),
+    }
 
 
 @app.post(

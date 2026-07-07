@@ -27,7 +27,7 @@ def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
         "STORAGE",
         "=======",
         f"retained events  {summary.retained_events}",
-        f"oldest event     {_oldest_label(summary.oldest_event_age_days)}",
+        f"oldest retained  {_oldest_label(summary.oldest_event_age_days)}",
         f"database         {_database_label(summary)}",
     ]
     return "\n".join(lines)

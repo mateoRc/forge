@@ -12,7 +12,7 @@ def test_renders_persisted_activity_dashboard() -> None:
     assert "vault  " + "█" * 15 + " 2" in output
     assert "atlas  " + "█" * 8 + " 1" in output
     assert "retained events  42" in output
-    assert "oldest event     12 days" in output
+    assert "oldest retained  12 days" in output
     assert "database         23.0 / 128 MiB" in output
 
 
@@ -29,7 +29,7 @@ def test_renders_in_memory_empty_storage() -> None:
 
     output = render(summary)
 
-    assert "oldest event     none" in output
+    assert "oldest retained  none" in output
     assert "database         in memory" in output
 
 
