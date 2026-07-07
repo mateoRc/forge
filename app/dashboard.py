@@ -27,7 +27,7 @@ def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
         "STORAGE",
         "=======",
         f"retained events  {summary.retained_events}",
-        f"oldest retained  {_oldest_label(summary.oldest_event_age_days)}",
+        f"oldest retained  {_oldest_label(summary.oldest_event_at)}",
         f"database         {_database_label(summary)}",
     ]
     return "\n".join(lines)
@@ -42,12 +42,10 @@ def _window_label(hours: int) -> str:
     return labels.get(hours, f"LAST {hours} HOURS")
 
 
-def _oldest_label(age_days: int | None) -> str:
-    if age_days is None:
+def _oldest_label(oldest_event_at: str | None) -> str:
+    if oldest_event_at is None:
         return "none"
-    if age_days == 0:
-        return "today"
-    return f"{age_days} day{'s' if age_days != 1 else ''}"
+    return oldest_event_at
 
 
 def _database_label(summary: Summary) -> str:

@@ -35,7 +35,11 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         dashboard_response = await client.get("/dashboard", headers=AUTH_HEADERS)
 
     assert event_response.status_code == 204
-    assert summary_response.json() == {
+    summary = summary_response.json()
+    oldest_event_at = summary.pop("oldest_event_at")
+    assert len(oldest_event_at) == 20
+    assert oldest_event_at.endswith(" UTC")
+    assert summary == {
         "window_hours": 24,
         "requests": 1,
         "errors": 0,
@@ -45,7 +49,6 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         "services": {"vault": 1},
         "commands": {"grep": 1},
         "retained_events": 1,
-        "oldest_event_age_days": 0,
         "database_bytes": None,
         "database_max_bytes": 134217728,
     }

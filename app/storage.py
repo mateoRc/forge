@@ -24,7 +24,7 @@ class StoredSummary:
     services: dict[str, int]
     commands: dict[str, int]
     retained_events: int
-    oldest_event_age_days: int | None
+    oldest_event_at: str | None
     database_bytes: int | None
     database_max_bytes: int
 
@@ -125,7 +125,7 @@ class SQLiteEventStore:
             services=services,
             commands=commands,
             retained_events=retained["count"],
-            oldest_event_age_days=_age_days(now, retained["oldest"]),
+            oldest_event_at=_utc_label(retained["oldest"]),
             database_bytes=(
                 None
                 if self._database_path == DEFAULT_DATABASE_PATH
@@ -267,11 +267,11 @@ def _utc_text(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="seconds")
 
 
-def _age_days(now: datetime, oldest: str | None) -> int | None:
-    if oldest is None:
+def _utc_label(value: str | None) -> str | None:
+    if value is None:
         return None
-    recorded_at = datetime.fromisoformat(oldest)
-    return max(0, (now.astimezone(UTC) - recorded_at).days)
+    recorded_at = datetime.fromisoformat(value)
+    return recorded_at.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def _file_size(path: Path) -> int:

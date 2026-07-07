@@ -146,7 +146,7 @@ def test_summary_applies_selected_time_window() -> None:
     assert daily.commands == {"current": 1}
     assert weekly.commands == {"older": 1, "current": 1}
     assert daily.retained_events == 2
-    assert daily.oldest_event_age_days == 2
+    assert daily.oldest_event_at == "2026-07-01 00:00 UTC"
 
 
 def test_database_size_limit_removes_oldest_events() -> None:

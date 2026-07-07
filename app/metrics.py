@@ -70,7 +70,7 @@ class Metrics:
             services=stored.services,
             commands=stored.commands,
             retained_events=stored.retained_events,
-            oldest_event_age_days=stored.oldest_event_age_days,
+            oldest_event_at=stored.oldest_event_at,
             database_bytes=stored.database_bytes,
             database_max_bytes=stored.database_max_bytes,
         )

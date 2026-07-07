@@ -36,6 +36,6 @@ class Summary(BaseModel):
     services: dict[str, int]
     commands: dict[str, int]
     retained_events: int
-    oldest_event_age_days: int | None
+    oldest_event_at: str | None
     database_bytes: int | None
     database_max_bytes: int

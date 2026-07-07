@@ -12,7 +12,7 @@ def test_renders_persisted_activity_dashboard() -> None:
     assert "vault  " + "█" * 15 + " 2" in output
     assert "atlas  " + "█" * 8 + " 1" in output
     assert "retained events  42" in output
-    assert "oldest retained  12 days" in output
+    assert "oldest retained  2026-07-07 09:14 UTC" in output
     assert "database         23.0 / 128 MiB" in output
 
 
@@ -25,7 +25,7 @@ def test_uses_configured_bar_width() -> None:
 def test_renders_in_memory_empty_storage() -> None:
     summary = _summary()
     summary.database_bytes = None
-    summary.oldest_event_age_days = None
+    summary.oldest_event_at = None
 
     output = render(summary)
 
@@ -44,7 +44,7 @@ def _summary() -> Summary:
         services={"vault": 2, "atlas": 1},
         commands={"grep": 2, "search": 1},
         retained_events=42,
-        oldest_event_age_days=12,
+        oldest_event_at="2026-07-07 09:14 UTC",
         database_bytes=23 * 1024 * 1024,
         database_max_bytes=128 * 1024 * 1024,
     )
