@@ -170,7 +170,7 @@ async def _test_filtered_summary_and_configurable_dashboard() -> None:
             params={"service": "vault", "width": 5},
         )
 
-    assert summary_response.json()["commands"] == {"compile": 1}
+    assert summary_response.json()["commands"] == {}
     assert "vault  " + "█" * 5 + " 1" in dashboard_response.text
 
 

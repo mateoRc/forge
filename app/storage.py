@@ -118,7 +118,14 @@ class SQLiteEventStore:
                 )
             )
             services = self._counts("service", where, parameters)
-            commands = self._counts("name", where, parameters)
+            commands = self._counts(
+                "name",
+                _and_where_clause(
+                    where,
+                    "event IN ('command.executed', 'command.runtime_error')",
+                ),
+                parameters,
+            )
             retained = self._connection.execute(
                 "SELECT COUNT(*) AS count, MIN(recorded_at) AS oldest FROM events"
             ).fetchone()
@@ -265,6 +272,12 @@ def _where_clause(
             parameters.append(value)
     where = f" WHERE {' AND '.join(filters)}" if filters else ""
     return where, tuple(parameters)
+
+
+def _and_where_clause(where: str, condition: str) -> str:
+    if where:
+        return f"{where} AND {condition}"
+    return f" WHERE {condition}"
 
 
 def _runtime_error_condition() -> str:

@@ -4,6 +4,7 @@ from app.models import Summary
 
 def test_renders_persisted_activity_dashboard() -> None:
     output = render(_summary())
+    assert "POPULAR COMMANDS" in output
 
     assert "ACTIVITY · LAST 24 HOURS" in output
     assert "requests       3" in output

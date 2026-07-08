@@ -13,7 +13,8 @@ def test_aggregates_requests_errors_duration_services_and_commands() -> None:
     metrics = Metrics()
     metrics.record(_event("vault", "grep", 8, 0))
     metrics.record(_event("vault", "cat", 4, 1))
-    metrics.record(_event("atlas", "search", 6, 0))
+    metrics.record(_event("vault", "search", 3, 0))
+    metrics.record(_atlas_search_event())
     metrics.record(
         Event(
             service="vault",
@@ -26,21 +27,33 @@ def test_aggregates_requests_errors_duration_services_and_commands() -> None:
 
     summary = metrics.summary()
 
-    assert summary.requests == 4
+    assert summary.requests == 5
     assert summary.errors == 1
     assert summary.user_errors == 1
-    assert summary.avg_ms == 7
-    assert summary.median_ms == 7
+    assert summary.avg_ms == 6.2
+    assert summary.median_ms == 6
     assert summary.p95_ms == 10
-    assert summary.services == {"vault": 3, "atlas": 1}
+    assert summary.services == {"vault": 4, "atlas": 1}
     assert summary.commands == {"grep": 1, "cat": 1, "search": 1, "panic": 1}
+
+
+def test_commands_exclude_backend_service_events_with_the_same_name() -> None:
+    metrics = Metrics()
+    metrics.record(_event("vault", "search", 4, 0))
+    metrics.record(_atlas_search_event())
+
+    summary = metrics.summary()
+
+    assert summary.requests == 2
+    assert summary.services == {"vault": 1, "atlas": 1}
+    assert summary.commands == {"search": 1}
 
 
 def test_filters_events_and_recalculates_aggregates() -> None:
     metrics = Metrics()
     metrics.record(_event("vault", "grep", 8, 0))
     metrics.record(_event("vault", "cat", 4, 1))
-    metrics.record(_event("atlas", "search", 6, 0))
+    metrics.record(_atlas_search_event())
 
     summary = metrics.summary(service="vault", name="cat")
 
@@ -186,8 +199,18 @@ def test_database_size_limit_removes_oldest_events() -> None:
 def _event(service: str, name: str, duration_ms: int, exit_code: int) -> Event:
     return Event(
         service=service,
-        event="request.completed",
+        event="command.executed",
         name=name,
         duration_ms=duration_ms,
         exit_code=exit_code,
+    )
+
+
+def _atlas_search_event() -> Event:
+    return Event(
+        service="atlas",
+        event="search.executed",
+        name="search",
+        duration_ms=6,
+        exit_code=0,
     )
