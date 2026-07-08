@@ -6,11 +6,13 @@ MEBIBYTE = 1024 * 1024
 
 def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
     error_rate = summary.errors / summary.requests if summary.requests else 0
+    user_error_rate = summary.user_errors / summary.requests if summary.requests else 0
     lines = [
         f"ACTIVITY · {_window_label(summary.window_hours)}",
         "========================",
         f"requests       {summary.requests}",
-        f"errors         {summary.errors}  ({error_rate:.1%})",
+        f"runtime errors {summary.errors}  ({error_rate:.1%})",
+        f"user errors    {summary.user_errors}  ({user_error_rate:.1%})",
         (
             f"command time   {summary.avg_ms:g} ms avg · "
             f"{summary.median_ms:g} ms p50 · {summary.p95_ms:g} ms p95"

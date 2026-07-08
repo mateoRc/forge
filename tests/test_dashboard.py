@@ -7,7 +7,8 @@ def test_renders_persisted_activity_dashboard() -> None:
 
     assert "ACTIVITY · LAST 24 HOURS" in output
     assert "requests       3" in output
-    assert "errors         1  (33.3%)" in output
+    assert "runtime errors 1  (33.3%)" in output
+    assert "user errors    2  (66.7%)" in output
     assert "command time   6 ms avg · 6 ms p50 · 8 ms p95" in output
     assert "vault  " + "█" * 15 + " 2" in output
     assert "atlas  " + "█" * 8 + " 1" in output
@@ -38,6 +39,7 @@ def _summary() -> Summary:
         window_hours=24,
         requests=3,
         errors=1,
+        user_errors=2,
         avg_ms=6,
         median_ms=6,
         p95_ms=8,

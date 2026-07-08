@@ -64,6 +64,7 @@ class Metrics:
             window_hours=window_hours,
             requests=stored.requests,
             errors=stored.errors,
+            user_errors=stored.user_errors,
             avg_ms=round(stored.average_ms, 2),
             median_ms=round(median_duration, 2),
             p95_ms=_percentile(stored.durations, 0.95),

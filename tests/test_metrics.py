@@ -14,16 +14,26 @@ def test_aggregates_requests_errors_duration_services_and_commands() -> None:
     metrics.record(_event("vault", "grep", 8, 0))
     metrics.record(_event("vault", "cat", 4, 1))
     metrics.record(_event("atlas", "search", 6, 0))
+    metrics.record(
+        Event(
+            service="vault",
+            event="command.runtime_error",
+            name="panic",
+            duration_ms=10,
+            exit_code=1,
+        )
+    )
 
     summary = metrics.summary()
 
-    assert summary.requests == 3
+    assert summary.requests == 4
     assert summary.errors == 1
-    assert summary.avg_ms == 6
-    assert summary.median_ms == 6
-    assert summary.p95_ms == 8
-    assert summary.services == {"vault": 2, "atlas": 1}
-    assert summary.commands == {"grep": 1, "cat": 1, "search": 1}
+    assert summary.user_errors == 1
+    assert summary.avg_ms == 7
+    assert summary.median_ms == 7
+    assert summary.p95_ms == 10
+    assert summary.services == {"vault": 3, "atlas": 1}
+    assert summary.commands == {"grep": 1, "cat": 1, "search": 1, "panic": 1}
 
 
 def test_filters_events_and_recalculates_aggregates() -> None:
@@ -35,7 +45,8 @@ def test_filters_events_and_recalculates_aggregates() -> None:
     summary = metrics.summary(service="vault", name="cat")
 
     assert summary.requests == 1
-    assert summary.errors == 1
+    assert summary.errors == 0
+    assert summary.user_errors == 1
     assert summary.avg_ms == 4
     assert summary.median_ms == 4
     assert summary.services == {"vault": 1}

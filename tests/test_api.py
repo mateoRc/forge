@@ -43,6 +43,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         "window_hours": 24,
         "requests": 1,
         "errors": 0,
+        "user_errors": 0,
         "avg_ms": 8.0,
         "median_ms": 8.0,
         "p95_ms": 8.0,

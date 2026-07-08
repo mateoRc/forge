@@ -19,6 +19,7 @@ SIZE_REDUCTION_BATCH = 500
 class StoredSummary:
     requests: int
     errors: int
+    user_errors: int
     average_ms: float
     durations: tuple[int, ...]
     services: dict[str, int]
@@ -91,12 +92,16 @@ class SQLiteEventStore:
         where, parameters = _where_clause(since, service, event, name)
         with self._lock:
             self._enforce_limits()
+            runtime_error = _runtime_error_condition()
             totals = self._connection.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS requests,
-                    COALESCE(SUM(CASE WHEN exit_code != 0 THEN 1 ELSE 0 END), 0)
+                    COALESCE(SUM(CASE WHEN {runtime_error} THEN 1 ELSE 0 END), 0)
                         AS errors,
+                    COALESCE(SUM(CASE
+                        WHEN exit_code != 0 AND NOT ({runtime_error})
+                        THEN 1 ELSE 0 END), 0) AS user_errors,
                     COALESCE(AVG(duration_ms), 0) AS average_ms
                 FROM events
                 """
@@ -120,6 +125,7 @@ class SQLiteEventStore:
         return StoredSummary(
             requests=totals["requests"],
             errors=totals["errors"],
+            user_errors=totals["user_errors"],
             average_ms=totals["average_ms"],
             durations=durations,
             services=services,
@@ -259,6 +265,10 @@ def _where_clause(
             parameters.append(value)
     where = f" WHERE {' AND '.join(filters)}" if filters else ""
     return where, tuple(parameters)
+
+
+def _runtime_error_condition() -> str:
+    return "event IN ('command.runtime_error', 'runtime.error') OR exit_code >= 128"
 
 
 def _utc_text(value: datetime) -> str:

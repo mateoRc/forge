@@ -30,6 +30,7 @@ class Summary(BaseModel):
     window_hours: int
     requests: int
     errors: int
+    user_errors: int
     avg_ms: float
     median_ms: float
     p95_ms: float
