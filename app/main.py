@@ -45,10 +45,12 @@ OptionalFilter = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
     ),
 ]
-TimeWindow = Annotated[Literal[24, 168, 720] | None, Query()]
+TimeWindow = Annotated[int | None, Query()]
 
 
 def selected_window(hours: int | None, window: str | None) -> int | None:
+    if hours is not None and hours not in (24, 168, 720):
+        raise HTTPException(status_code=422, detail="hours must be 24, 168, or 720")
     if window == "all":
         if hours is not None:
             raise HTTPException(status_code=422, detail="Use either hours or window=all")
