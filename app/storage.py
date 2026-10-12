@@ -82,13 +82,14 @@ class SQLiteEventStore:
 
     def summary(
         self,
-        window_hours: int,
+        window_hours: int | None,
         service: str | None = None,
         event: str | None = None,
         name: str | None = None,
+        include_invalid: bool = False,
     ) -> StoredSummary:
         now = self._now()
-        since = _utc_text(now - timedelta(hours=window_hours))
+        since = None if window_hours is None else _utc_text(now - timedelta(hours=window_hours))
         where, parameters = _where_clause(since, service, event, name)
         with self._lock:
             self._enforce_limits()
@@ -122,7 +123,8 @@ class SQLiteEventStore:
                 "name",
                 _and_where_clause(
                     where,
-                    "event IN ('command.executed', 'command.runtime_error')",
+                    "event IN ('command.executed', 'command.runtime_error')"
+                    + ("" if include_invalid else " AND exit_code != 127"),
                 ),
                 parameters,
             )
@@ -259,13 +261,13 @@ class SQLiteEventStore:
 
 
 def _where_clause(
-    since: str,
+    since: str | None,
     service: str | None,
     event: str | None,
     name: str | None,
 ) -> tuple[str, tuple[str, ...]]:
-    filters = ["recorded_at >= ?"]
-    parameters = [since]
+    filters = ["recorded_at >= ?"] if since is not None else []
+    parameters = [since] if since is not None else []
     for column, value in (("service", service), ("event", event), ("name", name)):
         if value is not None:
             filters.append(f"{column} = ?")

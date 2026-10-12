@@ -27,7 +27,7 @@ class Event(BaseModel):
 
 
 class Summary(BaseModel):
-    window_hours: int
+    window_hours: int | None
     requests: int
     errors: int
     user_errors: int

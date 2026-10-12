@@ -174,6 +174,45 @@ async def _test_filtered_summary_and_configurable_dashboard() -> None:
     assert "vault  " + "█" * 5 + " 1" in dashboard_response.text
 
 
+def test_all_retained_window_and_invalid_name_flag() -> None:
+    asyncio.run(_test_all_retained_window_and_invalid_name_flag())
+
+
+async def _test_all_retained_window_and_invalid_name_flag() -> None:
+    metrics.reset()
+    metrics.record(Event(service="vault", event="command.executed", name="grep", duration_ms=8, exit_code=0))
+    metrics.record(Event(service="vault", event="command.executed", name="rude_word", duration_ms=2, exit_code=127))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://forge") as client:
+        default = await client.get("/dashboard", headers=AUTH_HEADERS)
+        weekly = await client.get("/dashboard", headers=AUTH_HEADERS, params={"hours": 168})
+        all_time = await client.get("/dashboard", headers=AUTH_HEADERS, params={"window": "all"})
+        including_invalid = await client.get(
+            "/dashboard", headers=AUTH_HEADERS,
+            params={"window": "all", "include_invalid": "true"},
+        )
+        summary = await client.get("/summary", headers=AUTH_HEADERS, params={"window": "all"})
+        summary_with_invalid = await client.get(
+            "/summary", headers=AUTH_HEADERS,
+            params={"window": "all", "include_invalid": "true"},
+        )
+        ambiguous = await client.get(
+            "/dashboard", headers=AUTH_HEADERS, params={"window": "all", "hours": 24},
+        )
+
+    assert default.status_code == 200 and "LAST 24 HOURS" in default.text
+    assert weekly.status_code == 200 and "LAST 7 DAYS" in weekly.text
+    assert "rude_word" not in default.text
+    assert all_time.status_code == 200 and "ALL TIME" in all_time.text
+    assert "rude_word" not in all_time.text
+    assert including_invalid.status_code == 200 and "rude_word" in including_invalid.text
+    assert summary.json()["window_hours"] is None
+    assert summary.json()["requests"] == 2
+    assert summary.json()["commands"] == {"grep": 1}
+    assert summary_with_invalid.json()["commands"] == {"grep": 1, "rude_word": 1}
+    assert ambiguous.status_code == 422
+
+
 def test_requires_authentication_but_leaves_health_public() -> None:
     asyncio.run(_test_requires_authentication_but_leaves_health_public())
 

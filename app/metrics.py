@@ -48,16 +48,18 @@ class Metrics:
 
     def summary(
         self,
-        window_hours: int = 24,
+        window_hours: int | None = 24,
         service: str | None = None,
         event: str | None = None,
         name: str | None = None,
+        include_invalid: bool = False,
     ) -> Summary:
         stored = self._store.summary(
             window_hours=window_hours,
             service=service,
             event=event,
             name=name,
+            include_invalid=include_invalid,
         )
         median_duration = median(stored.durations) if stored.durations else 0.0
         return Summary(

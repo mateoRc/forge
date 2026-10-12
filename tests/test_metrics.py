@@ -173,6 +173,25 @@ def test_summary_applies_selected_time_window() -> None:
     assert daily.oldest_event_at == "2026-07-01 00:00 UTC"
 
 
+def test_all_window_includes_retained_history_and_hides_unknown_command_names() -> None:
+    current = [datetime(2026, 7, 1, tzinfo=UTC)]
+    metrics = Metrics(retention_days=365, now=lambda: current[0])
+    metrics.record(_event("vault", "grep", 8, 0))
+    current[0] += timedelta(days=31)
+    metrics.record(_event("vault", "rude_word", 2, 127))
+
+    recent = metrics.summary()
+    all_time = metrics.summary(window_hours=None)
+    including_invalid = metrics.summary(window_hours=None, include_invalid=True)
+
+    assert recent.requests == 1
+    assert recent.commands == {}
+    assert all_time.requests == 2
+    assert all_time.user_errors == 1
+    assert all_time.commands == {"grep": 1}
+    assert including_invalid.commands == {"grep": 1, "rude_word": 1}
+
+
 def test_database_size_limit_removes_oldest_events() -> None:
     event_count = 800
     with tempfile.TemporaryDirectory() as directory:

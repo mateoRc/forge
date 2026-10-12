@@ -22,6 +22,13 @@ mounts that file on the `forge_data` Docker volume. Optional limits are
 `268435456`, or 256 MiB). Without a database path, direct development uses an
 in-memory database.
 
+`GET /dashboard` and `GET /summary` default to the last 24 hours. Pass
+`hours=168` or `hours=720` for 7 or 30 days, or `window=all` for all retained
+events. Unknown command names (exit code 127) are excluded from command
+rankings by default; `include_invalid=true` includes them. Request and error
+totals always include those events. The all-time range is limited by retention
+and database-size settings.
+
 ## Test
 
 ```sh

@@ -35,7 +35,9 @@ def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
     return "\n".join(lines)
 
 
-def _window_label(hours: int) -> str:
+def _window_label(hours: int | None) -> str:
+    if hours is None:
+        return "ALL TIME"
     labels = {
         24: "LAST 24 HOURS",
         168: "LAST 7 DAYS",
