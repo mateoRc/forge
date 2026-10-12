@@ -51,7 +51,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
         "commands": {"grep": 1},
         "retained_events": 1,
         "database_bytes": None,
-        "database_max_bytes": 134217728,
+        "database_max_bytes": 268435456,
     }
     assert dashboard_response.status_code == 200
     assert "grep  " + "█" * 15 + " 1" in dashboard_response.text

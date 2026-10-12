@@ -18,9 +18,9 @@ For direct API development, run the application directly and set
 
 Persistence is enabled when `FORGE_DATABASE_PATH` points to a file. Production
 mounts that file on the `forge_data` Docker volume. Optional limits are
-`FORGE_RETENTION_DAYS` (default `30`) and `FORGE_MAX_DATABASE_BYTES` (default
-`134217728`). Without a database path, direct development uses an in-memory
-database.
+`FORGE_RETENTION_DAYS` (default `365`) and `FORGE_MAX_DATABASE_BYTES` (default
+`268435456`, or 256 MiB). Without a database path, direct development uses an
+in-memory database.
 
 ## Test
 
