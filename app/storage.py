@@ -17,6 +17,7 @@ SIZE_REDUCTION_BATCH = 500
 
 @dataclass(frozen=True)
 class StoredSummary:
+    unique_visitors: int
     requests: int
     errors: int
     user_errors: int
@@ -80,6 +81,15 @@ class SQLiteEventStore:
             self._connection.commit()
             self._enforce_limits()
 
+    def record_visit(self, visitor_id: str) -> None:
+        with self._lock:
+            self._connection.execute(
+                "INSERT INTO visits (visited_at, visitor_id) VALUES (?, ?)",
+                (_utc_text(self._now()), visitor_id),
+            )
+            self._connection.commit()
+            self._enforce_limits()
+
     def summary(
         self,
         window_hours: int | None,
@@ -131,7 +141,13 @@ class SQLiteEventStore:
             retained = self._connection.execute(
                 "SELECT COUNT(*) AS count, MIN(recorded_at) AS oldest FROM events"
             ).fetchone()
+            unique_visitors = self._connection.execute(
+                "SELECT COUNT(DISTINCT visitor_id) FROM visits"
+                + (" WHERE visited_at >= ?" if since is not None else ""),
+                (() if since is None else (since,)),
+            ).fetchone()[0]
         return StoredSummary(
+            unique_visitors=unique_visitors,
             requests=totals["requests"],
             errors=totals["errors"],
             user_errors=totals["user_errors"],
@@ -152,6 +168,7 @@ class SQLiteEventStore:
     def reset(self) -> None:
         with self._lock:
             self._connection.execute("DELETE FROM events")
+            self._connection.execute("DELETE FROM visits")
             self._connection.commit()
 
     def close(self) -> None:
@@ -218,25 +235,41 @@ class SQLiteEventStore:
             "DELETE FROM events WHERE recorded_at < ?",
             (cutoff,),
         )
+        self._connection.execute(
+            "DELETE FROM visits WHERE visited_at < ?",
+            (cutoff,),
+        )
         self._connection.commit()
 
         while self._database_size() > self._max_database_bytes:
             event_count = self._connection.execute(
                 "SELECT COUNT(*) FROM events"
             ).fetchone()[0]
+            visit_count = self._connection.execute(
+                "SELECT COUNT(*) FROM visits"
+            ).fetchone()[0]
             batch_size = min(
                 SIZE_REDUCTION_BATCH,
-                max(1, event_count // 10),
+                max(1, (event_count + visit_count) // 10),
             )
-            deleted = self._connection.execute(
-                """
-                DELETE FROM events
-                WHERE id IN (
-                    SELECT id FROM events ORDER BY id LIMIT ?
-                )
-                """,
-                (batch_size,),
-            ).rowcount
+            oldest_event = self._connection.execute(
+                "SELECT recorded_at FROM events ORDER BY recorded_at, id LIMIT 1"
+            ).fetchone()
+            oldest_visit = self._connection.execute(
+                "SELECT visited_at FROM visits ORDER BY visited_at, id LIMIT 1"
+            ).fetchone()
+            if oldest_event is not None and (
+                oldest_visit is None or oldest_event[0] <= oldest_visit[0]
+            ):
+                deleted = self._connection.execute(
+                    "DELETE FROM events WHERE id IN (SELECT id FROM events ORDER BY recorded_at, id LIMIT ?)",
+                    (batch_size,),
+                ).rowcount
+            else:
+                deleted = self._connection.execute(
+                    "DELETE FROM visits WHERE id IN (SELECT id FROM visits ORDER BY visited_at, id LIMIT ?)",
+                    (batch_size,),
+                ).rowcount
             self._connection.commit()
             self._compact()
             if deleted == 0:

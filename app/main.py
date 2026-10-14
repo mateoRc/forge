@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from app.auth import require_service_token
 from app.dashboard import render
 from app.metrics import Metrics
-from app.models import Event, Summary
+from app.models import Event, Summary, Visit
 
 app = FastAPI(title="Forge")
 metrics = Metrics.from_environment()
@@ -34,6 +34,16 @@ def service_status() -> dict[str, int | str]:
 )
 def record_event(event: Event) -> Response:
     metrics.record(event)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@app.post(
+    "/visits",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_service_token)],
+)
+def record_visit(visit: Visit) -> Response:
+    metrics.record_visit(visit.visitor_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

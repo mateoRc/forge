@@ -26,8 +26,19 @@ class Event(BaseModel):
     exit_code: int = Field(ge=0, le=MAX_EXIT_CODE)
 
 
+class Visit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    visitor_id: str = Field(
+        min_length=36,
+        max_length=36,
+        pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+    )
+
+
 class Summary(BaseModel):
     window_hours: int | None
+    unique_visitors: int
     requests: int
     errors: int
     user_errors: int

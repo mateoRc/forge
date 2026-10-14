@@ -108,6 +108,38 @@ def test_events_survive_database_reopen() -> None:
     assert summary.commands == {"grep": 1}
 
 
+def test_unique_visitors_survive_reopen_and_respect_time_windows() -> None:
+    current = [datetime(2026, 7, 1, tzinfo=UTC)]
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        first = Metrics(database, now=lambda: current[0])
+        first.record_visit("12345678-1234-4123-8123-123456789abc")
+        first.record_visit("12345678-1234-4123-8123-123456789abc")
+        first.record_visit("fedcbafe-1234-4123-8123-123456789abc")
+        current[0] += timedelta(days=2)
+        first.record_visit("12345678-1234-4123-8123-123456789abc")
+        first.record_visit("abcdefab-1234-4123-8123-123456789abc")
+        first.close()
+
+        second = Metrics(database, now=lambda: current[0])
+        daily = second.summary(window_hours=24)
+        weekly = second.summary(window_hours=168)
+        second.close()
+
+    assert daily.unique_visitors == 2
+    assert weekly.unique_visitors == 3
+    assert daily.requests == 0
+
+
+def test_expired_visits_are_removed() -> None:
+    current = [datetime(2026, 7, 1, tzinfo=UTC)]
+    metrics = Metrics(retention_days=1, now=lambda: current[0])
+    metrics.record_visit("12345678-1234-4123-8123-123456789abc")
+    current[0] += timedelta(days=2)
+
+    assert metrics.summary(window_hours=None).unique_visitors == 0
+
+
 def test_applies_all_database_migrations() -> None:
     with tempfile.TemporaryDirectory() as directory:
         database = Path(directory) / "forge.db"
@@ -125,8 +157,32 @@ def test_applies_all_database_migrations() -> None:
                 )
             }
 
-    assert version == 2
+    assert version == 3
     assert indexes == {"events_recorded_at_idx", "events_dimensions_idx"}
+
+
+def test_existing_event_database_upgrades_without_losing_events() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        database = Path(directory) / "forge.db"
+        with closing(sqlite3.connect(database)) as connection:
+            migrations = Path(__file__).parents[1] / "app" / "migrations"
+            connection.executescript((migrations / "001_create_events.sql").read_text())
+            connection.executescript((migrations / "002_add_event_indexes.sql").read_text())
+            connection.execute("PRAGMA user_version = 2")
+            connection.execute(
+                "INSERT INTO events (recorded_at, service, event, name, duration_ms, exit_code) "
+                "VALUES (?, 'vault', 'command.executed', 'ls', 1, 0)",
+                (datetime.now(UTC).isoformat(timespec="seconds"),),
+            )
+            connection.commit()
+
+        metrics = Metrics(database)
+        metrics.record_visit("12345678-1234-4123-8123-123456789abc")
+        summary = metrics.summary()
+        metrics.close()
+
+    assert summary.requests == 1
+    assert summary.unique_visitors == 1
 
 
 def test_records_server_generated_utc_timestamp() -> None:

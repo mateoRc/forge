@@ -41,6 +41,7 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
     assert oldest_event_at.endswith(" UTC")
     assert summary == {
         "window_hours": 24,
+        "unique_visitors": 0,
         "requests": 1,
         "errors": 0,
         "user_errors": 0,
@@ -59,6 +60,38 @@ async def _test_event_summary_and_dashboard_endpoints() -> None:
 
 def test_rejects_invalid_event() -> None:
     asyncio.run(_test_rejects_invalid_event())
+
+
+def test_visits_require_auth_and_validate_visitor_ids() -> None:
+    asyncio.run(_test_visits_require_auth_and_validate_visitor_ids())
+
+
+async def _test_visits_require_auth_and_validate_visitor_ids() -> None:
+    metrics.reset()
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://forge",
+    ) as client:
+        unauthorized = await client.post(
+            "/visits",
+            json={"visitor_id": "12345678-1234-4123-8123-123456789abc"},
+        )
+        invalid = await client.post(
+            "/visits",
+            headers=AUTH_HEADERS,
+            json={"visitor_id": "not-a-visitor-id"},
+        )
+        valid = await client.post(
+            "/visits",
+            headers=AUTH_HEADERS,
+            json={"visitor_id": "12345678-1234-4123-8123-123456789abc"},
+        )
+        dashboard = await client.get("/dashboard", headers=AUTH_HEADERS)
+
+    assert unauthorized.status_code in (401, 403)
+    assert invalid.status_code == 422
+    assert valid.status_code == 204
+    assert "unique visitors 1" in dashboard.text
 
 
 async def _test_rejects_invalid_event() -> None:

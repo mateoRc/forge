@@ -29,6 +29,13 @@ rankings by default; `include_invalid=true` includes them. Request and error
 totals always include those events. The all-time range is limited by retention
 and database-size settings.
 
+Vaultsh sends a browser-generated UUID on each page load through `/api/visit`.
+Forge stores visit timestamps and UUIDs in SQLite. `unique_visitors` in the
+summary and dashboard counts distinct UUIDs in the selected time window.
+Refreshing a page keeps the same ID; clearing site storage or using another
+browser creates a new one. Visits follow the same retention and database-size
+limits as events, and are excluded from request and command totals.
+
 ## Test
 
 ```sh

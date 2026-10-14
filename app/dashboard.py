@@ -11,6 +11,7 @@ def render(summary: Summary, width: int = DEFAULT_BAR_WIDTH) -> str:
         f"ACTIVITY · {_window_label(summary.window_hours)}",
         "========================",
         f"requests       {summary.requests}",
+        f"unique visitors {summary.unique_visitors}",
         f"runtime errors {summary.errors}  ({error_rate:.1%})",
         f"user errors    {summary.user_errors}  ({user_error_rate:.1%})",
         (

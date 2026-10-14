@@ -46,6 +46,9 @@ class Metrics:
     def record(self, event: Event) -> None:
         self._store.record(event)
 
+    def record_visit(self, visitor_id: str) -> None:
+        self._store.record_visit(visitor_id)
+
     def summary(
         self,
         window_hours: int | None = 24,
@@ -64,6 +67,7 @@ class Metrics:
         median_duration = median(stored.durations) if stored.durations else 0.0
         return Summary(
             window_hours=window_hours,
+            unique_visitors=stored.unique_visitors,
             requests=stored.requests,
             errors=stored.errors,
             user_errors=stored.user_errors,
